@@ -27,5 +27,8 @@
    那么这样一个可写流究竟是如何实现的呢？我们将通过手写代码来模拟fs.createWriteStream的功能来解析node中可写流的工作原理，下面们将通过一张图解来大概看看我们手写代码有哪些功能点，图片如下：
 
    ![image](https://raw.githubusercontent.com/RanCW/node-Stream/master/analyse.png)
-   
+
+   通过上面的图解代码的功能也就很明显了，下面我们就一一来实现，首先是创建一个类，构建好一个类的大体骨架：
+
+
    
