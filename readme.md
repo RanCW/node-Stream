@@ -24,6 +24,8 @@
       }
     })
    ```
-   那么这样一个可写流究竟是如何实现的呢？下面们将通过代码来一一说明
+   那么这样一个可写流究竟是如何实现的呢？下面们将通过一张图解来大概看看fs.createWriteStream是一个什么样的原理，图片如下：
+
+   ![image](https://raw.githubusercontent.com/RanCW/node-Stream/master/analyse.png)
    
    
