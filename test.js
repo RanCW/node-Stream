@@ -10,9 +10,9 @@ for(var i=0;i<10;i++){
 }
 
 
-ws.on('open',function () {
-  console.log('open');
-})
+// ws.on('open',function () {
+//   console.log('open');
+// })
 ws.on('drain',function () {
   console.log('drain');
 })

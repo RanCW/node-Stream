@@ -17,7 +17,6 @@ class MyWriteStream extends EventEmiter{
     this.buffers = [];//缓存区
     this.length = 0;//表示缓存区字节的长度
 
-
     this.open();
   }
   open(){
@@ -26,7 +25,8 @@ class MyWriteStream extends EventEmiter{
         if(this.autoClose){
           this.destroy();
         }
-        return this.emit('error',err);
+        this.emit('error',err);
+        return;
       }
       this.fd=fd;
       this.emit('open');
@@ -69,7 +69,6 @@ class MyWriteStream extends EventEmiter{
     })
   }
   clearBuffer(){
-    //8 7
     let data = this.buffers.shift();
     if(data){
       this._write(data.chunk,data.encoding,()=>this.clearBuffer())
