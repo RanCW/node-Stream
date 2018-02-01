@@ -24,7 +24,7 @@
       }
     })
    ```
-   那么这样一个可写流究竟是如何实现的呢？下面们将通过一张图解来大概看看fs.createWriteStream是一个什么样的原理，图片如下：
+   那么这样一个可写流究竟是如何实现的呢？我们将通过手写代码来模拟fs.createWriteStream的功能来解析node中可写流的工作原理，下面们将通过一张图解来大概看看我们手写代码有哪些功能点，图片如下：
 
    ![image](https://raw.githubusercontent.com/RanCW/node-Stream/master/analyse.png)
    
