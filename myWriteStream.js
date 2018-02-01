@@ -47,7 +47,7 @@ class MyWriteStream extends EventEmiter{
     } else {//直接调用底层的写入方法进行写入
       //在底层写完当前数据后要清空缓存区
       this.writing = true;
-      this._write(chunk, encoding, () => {this.clearBuffer(),callback&&callback()});
+      this._write(chunk, encoding, () => {this.clearBuffer();callback&&callback()});
     }
     return ret;
   }
@@ -61,17 +61,18 @@ class MyWriteStream extends EventEmiter{
           this.destroy();
           this.emit('error',err);
         }
+      }else{
+          this.pos += bytesWrite;
+          //写入多少字母，缓存区减少多少字节
+          this.length -= bytesWrite;
+          callback && callback();
       }
-      this.pos += bytesWrite;
-      //写入多少字母，缓存区减少多少字节
-      this.length -= bytesWrite;
-      callback && callback();
     })
   }
   clearBuffer(){
     let data = this.buffers.shift();
     if(data){
-      this._write(data.chunk,data.encoding,()=>this.clearBuffer())
+      this._write(data.chunk,data.encoding,()=>{this.clearBuffer();data.callback()})
     }else{
       this.writing = false;
       //缓存区清空了

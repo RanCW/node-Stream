@@ -4,7 +4,7 @@ const ws=new writeStream('./2.txt',{
   highWaterMark:3
 })
 for(var i=0;i<10;i++){
-  ws.write('孤傲的山鹰,women都是好好子'+i+'\r\n','utf8',()=>{
+  ws.write('孤傲的山鹰,我们都是好都是好好子'+i+'\r\n','utf8',()=>{
     console.log('xiel');
   })
 }
