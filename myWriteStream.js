@@ -13,7 +13,7 @@ class MyWriteStream extends EventEmiter{
     this.start=options.start||0;//写入的开始位置
     this.pos=this.start;//写入的标示位置
     this.writing=false;//是否正在写入的标识
-    this.highWaterMark=options.highWaterMark||1024*16;
+    this.highWaterMark=options.highWaterMark||1024*16;//每次写入的最大值
     this.buffers = [];//缓存区
     this.length = 0;//表示缓存区字节的长度
 
@@ -36,9 +36,9 @@ class MyWriteStream extends EventEmiter{
     let chunk = Buffer.isBuffer(data)?data:Buffer.from(data,this.encoding);
     let len=chunk.length;
     this.length+=len;
-    //判断当前最新的缓存区是否小于最高水位线
+    //判断当前最新的缓存区是否小于每次写入的最大值
     let ret = this.length < this.highWaterMark;
-    if (this.writing) {//表示正在向底层写数据，则当前数据必须放在缓存区里
+    if (this.writing) {//表示正在向文件写数据，则当前数据必须放在缓存区里
       this.buffers.push({
         chunk,
         encoding,
@@ -63,7 +63,7 @@ class MyWriteStream extends EventEmiter{
         }
       }else{
           this.pos += bytesWrite;
-          //写入多少字母，缓存区减少多少字节
+          //写入多少数据，缓存区减少多少字节
           this.length -= bytesWrite;
           callback && callback();
       }
