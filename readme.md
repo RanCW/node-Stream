@@ -247,4 +247,288 @@
    ```
    ### 可读流 Readable - 可读的流 (例如 fs.createReadStream()).
    
-   fs.createReadStream()创建一个可读流[(例如 fs.createReadStream())](http://nodejs.cn/api/fs.html#fs_fs_createreadstream_path_options),
+   fs.createReadStream()创建一个可读流[(例如 fs.createReadStream())](http://nodejs.cn/api/fs.html#fs_fs_createreadstream_path_options),可读流其实与可写流很相似,但是可读流事实上工作在下面两种模式之一：flowing 和 paused 。
+   * 在 flowing 模式下， 可读流自动从系统底层读取数据，并通过 EventEmitter 接口的事件尽快将数据提供给应用。
+   * 在 paused 模式下，必须显式调用 stream.read() 方法来从流中读取数据片段。
+   
+   
+   可读流可以通过下面途径切换到 paused 模式：
+   * 如果不存在管道目标（pipe destination），可以通过调用 stream.pause() 方法实现。
+   * 如果存在管道目标，可以通过取消 'data' 事件监听，并调用 stream.unpipe() 方法移除所有管道目标来实现。
+   
+   这里需要记住的重要概念就是，可读流需要先为其提供消费或忽略数据的机制，才能开始提供数据。如果消费机制被禁用或取消，可读流将 尝试 停止生成数据。
+   
+   注意: 为了向后兼容，取消 'data' 事件监听并 不会 自动将流暂停。同时，如果存在管道目标（pipe destination），且目标状态变为可以接收数据（drain and ask for more data），调用了 stream.pause() 方法也并不保证流会一直 保持 暂停状态。
+   
+   注意: 如果 Readable 切换到 flowing 模式，且没有消费者处理流中的数据，这些数据将会丢失。 比如， 调用了 readable.resume() 方法却没有监听 'data' 事件，或是取消了 'data' 事件监听，就有可能出现这种情况。
+   
+   ##### flowing模式
+   ```javascript
+   //flowing 模式下createReadStream的工作代码如下：
+   let fs=require('fs');
+   let rs=fs.createReadStream('2.txt',{
+     highWaterMark:3,
+     encoding:'utf8'
+   })
+   rs.on('data',(data)=>{
+     console.log(data);
+   })
+    
+   ```
+   其实，flowing模式下的可读流的流程与可读流差异不大，所以，这里就不再画原理分析图了，可以参考上述可写流的原理分析图；手写原理分析完整代码如下：
+   
+   ```javascript
+    let EventEmitter = require('events');
+    let fs = require('fs');
+    class ReadStream extends EventEmitter {
+      constructor(path, options) {
+        super(path, options);
+        this.path = path;
+        this.flags = options.flags || 'r';
+        this.mode = options.mode || 0o666;
+        this.highWaterMark = options.highWaterMark || 64 * 1024;
+        this.pos = this.start = options.start || 0;
+        this.end = options.end;
+        this.encoding = options.encoding;
+        this.flowing = null;
+        this.buffer = Buffer.alloc(this.highWaterMark);
+        this.open();
+        this.on('newListener',(type,listener)=>{
+          if(type == 'data'){
+            this.flowing = true;
+            this.read();
+          }
+        });
+      }
+      read(){
+        if(typeof this.fd != 'number'){
+          return this.once('open',()=>this.read());
+        }
+        let howMuchToRead = this.end?Math.min(this.end - this.pos + 1,this.highWaterMark):this.highWaterMark;
+        fs.read(this.fd,this.buffer,0,howMuchToRead,this.pos,(err,bytes)=>{
+          if(err){
+            if(this.autoClose)
+              this.destroy();
+            return this.emit('error',err);
+          }
+          if(bytes){
+            let data = this.buffer.slice(0,bytes);
+            this.pos += bytes;
+            data = this.encoding?data.toString(this.encoding):data;
+            this.emit('data',data);
+            if(this.end && this.pos > this.end){
+              return this.endFn();
+            }else{
+              if(this.flowing)
+                this.read();
+            }
+          }else{
+            return this.endFn();
+          }
+    
+        })
+      }
+      endFn(){
+        this.emit('end');
+        this.destroy();
+      }
+      open() {
+        fs.open(this.path,this.flags,this.mode,(err,fd)=>{
+          if(err){
+            if(this.autoClose){
+              this.destroy();
+              return this.emit('error',err);
+            }
+          }
+          this.fd = fd;
+          this.emit('open');
+        })
+      }
+      destroy(){
+        fs.close(this.fd,()=>{
+          this.emit('close');
+        });
+      }
+      pipe(dest){
+        this.on('data',data=>{
+          let flag = dest.write(data);
+          if(!flag){
+            this.pause();
+          }
+        });
+        dest.on('drain',()=>{
+          this.resume();
+        });
+      }
+      pause(){
+        this.flowing = false;
+      }
+      resume(){
+        this.flowing = true;
+        this.read();
+      }
+    }
+    module.exports = ReadStream;
+   
+   ```
+   
+   #####paused 模式
+   ```javascript
+   //fs.createReadStream原生api的代码如下：
+   let fs=require('fs');
+   let rs=fs.createReadStream('2.txt',{
+     highWaterMark:3,
+     encoding:'utf8'
+   })
+   rs.on('readable',()=>{
+     console.log(rs.read());
+   })
+     
+   ```
+   这里主要和flowing模式大同小异，只是这种模式下，读取到的数据会放到数据片段里面先缓存起来，并触发readable事件，再通过read方法来读取已读取到的数据片段。原理解析代码如下：
+   
+   ```javascript
+    let fs = require('fs');
+    let EventEmitter = require('events');
+    class ReadStream extends EventEmitter {
+      constructor(path, options) {
+        super(path, options);
+        this.path = path;
+        this.highWaterMark = options.highWaterMark || 64 * 1024;
+        this.buffer = Buffer.alloc(this.highWaterMark);
+        this.flags = options.flags || 'r';
+        this.encoding = options.encoding;
+        this.mode = options.mode || 0o666;
+        this.start = options.start || 0;
+        this.end = options.end;
+        this.pos = this.start;
+        this.autoClose = options.autoClose || true;
+        this.bytesRead = 0;
+        this.closed = false;
+        this.flowing;
+        this.needReadable = false;
+        this.length = 0;
+        this.buffers = [];
+        this.on('end', function () {
+          if (this.autoClose) {
+            this.destroy();
+          }
+        });
+        this.on('newListener', (type) => {
+          if (type == 'data') {
+            this.flowing = true;
+            this.read();
+          }
+          if (type == 'readable') {
+            this.read(0);
+          }
+        });
+        this.open();
+      }
+      open() {
+        fs.open(this.path, this.flags, this.mode, (err, fd) => {
+          if (err) {
+            if (this.autoClose) {
+              this.destroy();
+              return this.emit('error', err);
+            }
+          }
+          this.fd = fd;
+          this.emit('open');
+        });
+      }
+    
+      read(n) {
+        if (typeof this.fd != 'number') {
+          return this.once('open', () => this.read());
+        }
+        n = parseInt(n, 10);
+        if (n != n) {
+          n = this.length;
+        }
+        if (this.length == 0)
+          this.needReadable = true;
+        let ret;
+        if (0 < n < this.length) {
+          ret = Buffer.alloc(n);
+          let b;
+          let index = 0;
+          while (null != (b = this.buffers.shift())) {
+            for (let i = 0; i < b.length; i++) {
+              ret[index++] = b[i];
+              if (index == ret.length) {
+                this.length -= n;
+                b = b.slice(i + 1);
+                this.buffers.unshift(b);
+                break;
+              }
+            }
+          }
+          if (this.encoding) ret = ret.toString(this.encoding);
+        }
+        let _read = () => {
+          let m = this.end ? Math.min(this.end - this.pos + 1, this.highWaterMark) : this.highWaterMark;
+          fs.read(this.fd, this.buffer, 0, m, this.pos, (err, bytesRead) => {
+            if (err) {
+              return
+            }
+            let data;
+            if (bytesRead > 0) {
+              data = this.buffer.slice(0, bytesRead);
+              this.pos += bytesRead;
+              this.length += bytesRead;
+              if (this.end && this.pos > this.end) {
+                if (this.needReadable) {
+                  this.emit('readable');
+                }
+                this.emit('end');
+              } else {
+                this.buffers.push(data);
+                if (this.needReadable) {
+                  this.emit('readable');
+                  this.needReadable = false;
+                }
+              }
+            } else {
+              if (this.needReadable) {
+                this.emit('readable');
+              }
+              return this.emit('end');
+            }
+          })
+        }
+        if (this.length == 0 || (this.length < this.highWaterMark)) {
+          _read(0);
+        }
+        return ret;
+      }
+      destroy() {
+        fs.close(this.fd, (err) => {
+          this.emit('close');
+        });
+      }
+      pause() {
+        this.flowing = false;
+      }
+      resume() {
+        this.flowing = true;
+        this.read();
+      }
+      pipe(dest) {
+        this.on('data', (data) => {
+          let flag = dest.write(data);
+          if (!flag) this.pause();
+        });
+        dest.on('drain', () => {
+          this.resume();
+        });
+        this.on('end', () => {
+          dest.end();
+        });
+      }
+    }
+    module.exports = ReadStream;
+   ```
+   
+   以上就是个人大致对node中的stream的工作原理理解，欢迎大家多多指正，谢谢！
+   
