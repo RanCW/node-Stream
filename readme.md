@@ -11,7 +11,7 @@
    接下来让我们一起去看看stream中的流是怎么样来工作的。
    
 ### 可写流 Writable
-   ##### fs.createWriteStream(path[, options])创建一个可写流,对这个不太了解的可以查看[fs.createWriteStream(path[, options])](http://nodejs.cn/api/fs.html#fs_fs_createwritestream_path_options),这里对官方API就不再描述了。
+   ##### fs.createWriteStream(path[, options])创建一个可写流,对这个不太了解的可以查看[fs.createWriteStream(path[, options])](http://nodejs.cn/api/fs.html#fs_fs_createwritestream_path_options)
    
    ```javascript
     let fs=require('fs');
