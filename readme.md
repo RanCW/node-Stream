@@ -245,5 +245,6 @@
       
       module.exports=MyWriteStream;
    ```
-
+   ### 可读流 Readable - 可读的流 (例如 fs.createReadStream()).
    
+   fs.createReadStream()创建一个可读流[(例如 fs.createReadStream())](http://nodejs.cn/api/fs.html#fs_fs_createreadstream_path_options),
