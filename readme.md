@@ -1,35 +1,35 @@
-## node.js中流(Stream)的深入理解
+## node.js中流(Stream)的深度剖析
 
-   流（stream）在 Node.js 中是处理流数据的抽象接口（abstract interface）。stream 模块提供了基础的 API 。使用这些 API 可以很容易地来构建实现流接口的对象。Node.js 提供了多种流对象。流可以是可读的、可写的，或是可读写的。所有的流都是 EventEmitter 的实例。
+流（stream）在 Node.js 中是处理流数据的抽象接口（abstract interface）。stream 模块提供了基础的 API 。使用这些 API 可以很容易地来构建实现流接口的对象。Node.js 提供了多种流对象。流可以是可读的、可写的，或是可读写的。所有的流都是 EventEmitter 的实例。
    
-   Node.js 中有四种基本的流类型：
-   * Readable - 可读的流 (例如 fs.createReadStream()).
-   * Writable - 可写的流 (例如 fs.createWriteStream()).
-   * Duplex - 可读写的流 (例如 net.Socket).
-   * Transform - 在读写过程中可以修改和变换数据的 Duplex 流 (例如 zlib.createDeflate()).
+Node.js 中有四种基本的流类型：
+* Readable - 可读的流 (例如 fs.createReadStream()).
+* Writable - 可写的流 (例如 fs.createWriteStream()).
+* Duplex - 可读写的流 (例如 net.Socket).
+* Transform - 在读写过程中可以修改和变换数据的 Duplex 流 (例如 zlib.createDeflate()).
    
-   接下来让我们一起去看看stream中的流是怎么样来工作的。
+接下来让我们一起去看看stream中的流是怎么样来工作的。
    
 ### 可写流 Writable
-   ##### fs.createWriteStream(path[, options])创建一个可写流,对这个不太了解的可以查看[fs.createWriteStream(path[, options])](http://nodejs.cn/api/fs.html#fs_fs_createwritestream_path_options)
+##### fs.createWriteStream(path[, options])创建一个可写流,对这个不太了解的可以查看[fs.createWriteStream(path[, options])](http://nodejs.cn/api/fs.html#fs_fs_createwritestream_path_options)
    
-   ```javascript
-    let fs=require('fs');
-    let ws=fs.createWriteStream('2.txt',{
+```javascript
+  let fs=require('fs');
+  let ws=fs.createWriteStream('2.txt',{
       highWaterMark:3
-    })
-    ws.write('我们都是好孩子，哈哈、、、','utf8',(err)=>{
+  })
+  ws.write('我们都是好孩子，哈哈、、、','utf8',(err)=>{
       if(err){
         console.log(err);
       }
-    })
-   ```
-   那么这样一个可写流究竟是如何实现的呢？我们将通过手写代码来模拟fs.createWriteStream的功能来解析node中可写流的工作原理，下面们将通过一张图解来大概看看我们手写代码有哪些功能点，图片如下：
+  })
+```
+那么这样一个可写流究竟是如何实现的呢？我们将通过手写代码来模拟fs.createWriteStream的功能来解析node中可写流的工作原理，下面们将通过一张图解来大概看看我们手写代码有哪些功能点，图片如下：
 
-   ![image](https://raw.githubusercontent.com/RanCW/node-Stream/master/analyse.png)
+![image](https://raw.githubusercontent.com/RanCW/node-Stream/master/analyse.png)
 
-   通过上面的图解代码的功能也就很明显了，下面我们就一一来实现，首先是创建一个类，构建好一个类的大体骨架：
-   ```javascript
+通过上面的图解代码的功能也就很明显了，下面我们就一一来实现，首先是创建一个类，构建好一个类的大体骨架：
+```javascript
      let fs=require('fs');
      let EventEmiter=require('events');
      class MyWriteStream extends EventEmiter{
@@ -68,11 +68,11 @@
      }
      
      module.exports=MyWriteStream;
-   ```
-   * open方法
+```
+* open方法
    
-   如思维导图所示，open方法的功能主要是打开对应路径的文件与触发open事件，所以对应的代码片段如下：
-   ```javascript
+如思维导图所示，open方法的功能主要是打开对应路径的文件与触发open事件，所以对应的代码片段如下：
+```javascript
     open(){
         fs.open(this.path,this.flags,this.mode,(err,fd)=>{
           if(err){
@@ -86,9 +86,9 @@
           this.emit('open');
         })
       }
-   ```
-   * write方法代码段如下：
-   ```javascript
+```
+* write方法代码段如下：
+```javascript
     write(data,encoding,callback){
         let chunk = Buffer.isBuffer(data)?data:Buffer.from(data,this.encoding);
         let len=chunk.length;
@@ -108,9 +108,9 @@
         }
         return ret;
       }
-   ```
-   * _write方法如下：
-   ```javascript
+```
+* _write方法如下：
+```javascript
     _write(chunk,encoding,callback){
         if(typeof this.fd != 'number'){
           return this.once('open',()=>this._write(chunk, encoding, callback));
@@ -129,18 +129,18 @@
           }
         })
       }
-   ```
-   * destroy方法,代码如下：
-   ```javascript
+```
+* destroy方法,代码如下：
+```javascript
       destroy(){
           fs.close(this.fd,()=>{
             this.emit('end');
             this.emit('close');
           })
         }
-   ```
-   * clearBuffer方法，代码如下：
-   ```javascript
+```
+* clearBuffer方法，代码如下：
+```javascript
     clearBuffer(){
         let data = this.buffers.shift();
         if(data){
@@ -151,9 +151,9 @@
           this.emit('drain');
         }
       }
-   ```
-   * 最后完整的代码如下：
-   ```javascript
+```
+* 最后完整的代码如下：
+```javascript
       let fs=require('fs');
       let EventEmiter=require('events');
       
@@ -244,10 +244,10 @@
       }
       
       module.exports=MyWriteStream;
-   ```
-   ### 可读流 Readable - 可读的流 (例如 fs.createReadStream()).
+```
+### 可读流 Readable - 可读的流 (例如 fs.createReadStream()).
    
-   fs.createReadStream()创建一个可读流[(例如 fs.createReadStream())](http://nodejs.cn/api/fs.html#fs_fs_createreadstream_path_options),可读流其实与可写流很相似,但是可读流事实上工作在下面两种模式之一：flowing 和 paused 。
+fs.createReadStream()创建一个可读流[(例如 fs.createReadStream())](http://nodejs.cn/api/fs.html#fs_fs_createreadstream_path_options),可读流其实与可写流很相似,但是可读流事实上工作在下面两种模式之一：flowing 和 paused 。
    * 在 flowing 模式下， 可读流自动从系统底层读取数据，并通过 EventEmitter 接口的事件尽快将数据提供给应用。
    * 在 paused 模式下，必须显式调用 stream.read() 方法来从流中读取数据片段。
    
@@ -262,8 +262,8 @@
    
    注意: 如果 Readable 切换到 flowing 模式，且没有消费者处理流中的数据，这些数据将会丢失。 比如， 调用了 readable.resume() 方法却没有监听 'data' 事件，或是取消了 'data' 事件监听，就有可能出现这种情况。
    
-   ##### flowing模式
-   ```javascript
+##### flowing模式
+```javascript
    //flowing 模式下createReadStream的工作代码如下：
    let fs=require('fs');
    let rs=fs.createReadStream('2.txt',{
@@ -274,10 +274,10 @@
      console.log(data);
    })
     
-   ```
-   其实，flowing模式下的可读流的流程与可读流差异不大，所以，这里就不再画原理分析图了，可以参考上述可写流的原理分析图；手写原理分析完整代码如下：
+```
+其实，flowing模式下的可读流的流程与可读流差异不大，所以，这里就不再画原理分析图了，可以参考上述可写流的原理分析图；手写原理分析完整代码如下：
    
-   ```javascript
+```javascript
     let EventEmitter = require('events');
     let fs = require('fs');
     class ReadStream extends EventEmitter {
@@ -370,10 +370,10 @@
     }
     module.exports = ReadStream;
    
-   ```
+```
    
-   #####paused 模式
-   ```javascript
+#####paused 模式
+```javascript
    //fs.createReadStream原生api的代码如下：
    let fs=require('fs');
    let rs=fs.createReadStream('2.txt',{
@@ -384,10 +384,10 @@
      console.log(rs.read());
    })
      
-   ```
-   这里主要和flowing模式大同小异，只是这种模式下，读取到的数据会放到数据片段里面先缓存起来，并触发readable事件，再通过read方法来读取已读取到的数据片段。原理解析代码如下：
+```
+这里主要和flowing模式大同小异，只是这种模式下，读取到的数据会放到数据片段里面先缓存起来，并触发readable事件，再通过read方法来读取已读取到的数据片段。原理解析代码如下：
    
-   ```javascript
+```javascript
     let fs = require('fs');
     let EventEmitter = require('events');
     class ReadStream extends EventEmitter {
@@ -528,7 +528,11 @@
       }
     }
     module.exports = ReadStream;
-   ```
+```
    
-   以上就是个人大致对node中的stream的工作原理理解，欢迎大家多多指正，谢谢！
+以上就是个人大致对node中的stream的工作原理理解，欢迎大家多多指正，谢谢！
+
+参考资料：
+
+[Node.js v8.9.3 文档](http://nodejs.cn/api/)
    
